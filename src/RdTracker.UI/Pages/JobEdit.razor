@@ -1,0 +1,215 @@
+@page "/jobs/new"
+@page "/jobs/{Id:int}/edit"
+@using System.ComponentModel.DataAnnotations
+@inject IRdDataService Data
+@inject IClock Clock
+@inject SessionState Session
+@inject NavigationManager Nav
+
+<PageTitle>@Title · R&amp;D Tracker</PageTitle>
+
+@if (!Session.IsManager)
+{
+    <div class="empty">
+        <h1 class="h4">Only managers can plan jobs</h1>
+        <a href="jobs">Back to jobs</a>
+    </div>
+}
+else if (_data is not null)
+{
+    <header class="page-head">
+        <div>
+            <a class="small" href="jobs"><Icon Name="chevron-left" Size="14" /> Jobs</a>
+            <h1>@Title</h1>
+        </div>
+    </header>
+
+    <EditForm Model="_form" OnValidSubmit="SaveAsync" class="card-panel form-grid">
+        <DataAnnotationsValidator />
+
+        <div class="span-2">
+            <label class="form-label" for="project">Project</label>
+            <InputSelect id="project" class="form-select" @bind-Value="_form.ProjectId">
+                <option value="0">Choose…</option>
+                @foreach (var project in _data.Projects)
+                {
+                    <option value="@project.Id">@project.Name (@_data.BrandOf(project).Code)</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => _form.ProjectId" />
+        </div>
+
+        <div>
+            <label class="form-label" for="draftsman">Draftsman</label>
+            <InputSelect id="draftsman" class="form-select" @bind-Value="_form.DraftsmanId">
+                <option value="0">Choose…</option>
+                @foreach (var draftsman in _data.Draftsmen)
+                {
+                    <option value="@draftsman.Id">@draftsman.Name — @_data.TeamOf(draftsman).Name</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => _form.DraftsmanId" />
+        </div>
+
+        <div>
+            <label class="form-label" for="type">Model type</label>
+            <InputSelect id="type" class="form-select" @bind-Value="_form.ModelTypeId">
+                <option value="0">Choose…</option>
+                @foreach (var type in _data.ModelTypes)
+                {
+                    <option value="@type.Id">@type.Name (@type.StandardHours h new / @type.CopyHours h copy)</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => _form.ModelTypeId" />
+        </div>
+
+        <div>
+            <label class="form-label" for="kind">Kind</label>
+            <InputSelect id="kind" class="form-select" @bind-Value="_form.Kind">
+                <option value="@JobKind.New">New design</option>
+                <option value="@JobKind.Copy">Copy of an existing design</option>
+            </InputSelect>
+        </div>
+
+        <div>
+            <label class="form-label" for="quantity">Quantity</label>
+            <InputNumber id="quantity" class="form-control" @bind-Value="_form.Quantity" />
+            <ValidationMessage For="() => _form.Quantity" />
+        </div>
+
+        <div>
+            <label class="form-label" for="start">Planned start</label>
+            <InputDate id="start" class="form-control" @bind-Value="_form.PlannedStart" />
+        </div>
+
+        <div>
+            <label class="form-label" for="finish">Planned finish</label>
+            <InputDate id="finish" class="form-control" @bind-Value="_form.PlannedFinish" />
+            <button type="button" class="btn btn-link btn-sm px-0" id="btn-suggest" @onclick="SuggestFinish" disabled="@(EffortHours is null)">
+                @(EffortHours is { } hours ? $"Suggest from standard effort ({hours} h)" : "Choose a model type to get a suggestion")
+            </button>
+        </div>
+
+        <div class="span-2">
+            <label class="form-label" for="remark">Remark</label>
+            <InputTextArea id="remark" class="form-control" rows="2" @bind-Value="_form.Remark" />
+            <ValidationMessage For="() => _form.Remark" />
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger span-2 mb-0" role="alert">@_error</div>
+        }
+
+        <div class="span-2 d-flex gap-2">
+            <button type="submit" class="btn btn-brand">Save job</button>
+            <a class="btn btn-outline-secondary" href="@(Id is { } id ? $"jobs/{id}" : "jobs")">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    public sealed class JobForm
+    {
+        [Range(1, int.MaxValue, ErrorMessage = "Choose a project.")]
+        public int ProjectId { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "Choose a draftsman.")]
+        public int DraftsmanId { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "Choose a model type.")]
+        public int ModelTypeId { get; set; }
+
+        public JobKind Kind { get; set; }
+
+        [Range(1, 99, ErrorMessage = "Quantity must be between 1 and 99.")]
+        public int Quantity { get; set; } = 1;
+
+        public DateOnly PlannedStart { get; set; }
+
+        public DateOnly PlannedFinish { get; set; }
+
+        [StringLength(500)]
+        public string Remark { get; set; } = "";
+    }
+
+    [Parameter] public int? Id { get; set; }
+
+    private readonly JobForm _form = new();
+    private RdSnapshot? _data;
+    private DesignJob? _existing;
+    private string? _error;
+
+    private string Title => Id is null ? "New job" : $"Edit job #{Id}";
+
+    private int? EffortHours
+    {
+        get
+        {
+            var type = _data?.ModelTypes.FirstOrDefault(m => m.Id == _form.ModelTypeId);
+            if (type is null || _form.Quantity < 1)
+            {
+                return null;
+            }
+
+            return (_form.Kind == JobKind.Copy ? type.CopyHours : type.StandardHours) * _form.Quantity;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _data = await Data.GetSnapshotAsync();
+        _existing = Id is { } id ? _data.Jobs.FirstOrDefault(j => j.Id == id) : null;
+
+        if (_existing is not null)
+        {
+            _form.ProjectId = _existing.ProjectId;
+            _form.DraftsmanId = _existing.DraftsmanId;
+            _form.ModelTypeId = _existing.ModelTypeId;
+            _form.Kind = _existing.Kind;
+            _form.Quantity = _existing.Quantity;
+            _form.PlannedStart = _existing.PlannedStart;
+            _form.PlannedFinish = _existing.PlannedFinish;
+            _form.Remark = _existing.Remark;
+        }
+        else
+        {
+            _form.PlannedStart = WorkCalendar.NextWorkingDay(Clock.Today);
+            _form.PlannedFinish = _form.PlannedStart;
+        }
+    }
+
+    private void SuggestFinish()
+    {
+        if (EffortHours is { } hours)
+        {
+            _form.PlannedFinish = WorkCalendar.FinishDate(_form.PlannedStart, hours);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        var job = (_existing ?? new DesignJob()) with
+        {
+            ProjectId = _form.ProjectId,
+            DraftsmanId = _form.DraftsmanId,
+            ModelTypeId = _form.ModelTypeId,
+            Kind = _form.Kind,
+            Quantity = _form.Quantity,
+            PlannedStart = _form.PlannedStart,
+            PlannedFinish = _form.PlannedFinish,
+            Remark = (_form.Remark ?? "").Trim(),
+        };
+
+        try
+        {
+            var saved = await Data.SaveJobAsync(job);
+            Nav.NavigateTo($"jobs/{saved.Id}");
+        }
+        catch (RdValidationException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

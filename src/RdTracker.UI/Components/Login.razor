@@ -1,0 +1,65 @@
+@inject IAuthService Auth
+@inject SessionState Session
+
+<div class="login-page">
+    <div class="login-card">
+        <div class="brand brand-dark mb-1">
+            <span class="brand-mark"><Icon Name="ruler" Size="18" /></span>
+            <span>R&amp;D Tracker</span>
+        </div>
+        <p class="text-secondary mb-4">Plan design work, track actuals, keep every launch on time.</p>
+
+        <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+            <label class="form-label" for="username">Username</label>
+            <input id="username" class="form-control mb-3" @bind="_username" autocomplete="username" autocapitalize="none" />
+
+            <label class="form-label" for="password">Password</label>
+            <input id="password" type="password" class="form-control mb-3" @bind="_password" autocomplete="current-password" />
+
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger py-2" role="alert">@_error</div>
+            }
+
+            <button type="submit" class="btn btn-brand w-100" disabled="@_busy">Sign in</button>
+        </form>
+
+        <div class="demo-box mt-4">
+            <div class="fw-semibold mb-2">Demo accounts</div>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var (account, password) in DemoAuthService.Accounts)
+                {
+                    <button type="button" class="@($"btn btn-sm btn-outline-secondary demo-{account.Username}")"
+                            @onclick="() => SignInAsync(account.Username, password)">
+                        @account.Username <span class="text-secondary">· @account.Role</span>
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _username = "";
+    private string _password = "";
+    private string? _error;
+    private bool _busy;
+
+    private Task SubmitAsync() => SignInAsync(_username, _password);
+
+    private async Task SignInAsync(string username, string password)
+    {
+        _busy = true;
+        _error = null;
+        var user = await Auth.SignInAsync(username, password);
+        _busy = false;
+
+        if (user is null)
+        {
+            _error = "Incorrect username or password.";
+            return;
+        }
+
+        Session.SignIn(user);
+    }
+}

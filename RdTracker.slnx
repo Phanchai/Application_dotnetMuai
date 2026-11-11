@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RdTracker.Core/RdTracker.Core.csproj" />
+    <Project Path="src/RdTracker.UI/RdTracker.UI.csproj" />
+    <Project Path="src/RdTracker.Web/RdTracker.Web.csproj" />
+    <Project Path="src/RdTracker.App/RdTracker.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RdTracker.Tests/RdTracker.Tests.csproj" />
+  </Folder>
+</Solution>

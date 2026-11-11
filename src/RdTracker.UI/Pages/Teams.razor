@@ -1,0 +1,64 @@
+@page "/teams"
+@inject IRdDataService Data
+@inject IClock Clock
+
+<PageTitle>Teams · R&amp;D Tracker</PageTitle>
+
+<header class="page-head">
+    <div>
+        <h1>Teams</h1>
+        <p class="text-secondary mb-0">Capacity for @Format.Month(_today.Year, _today.Month)</p>
+    </div>
+</header>
+
+@if (_data is not null)
+{
+    <div class="team-grid">
+        @foreach (var team in _data.Teams)
+        {
+            var members = _workload.Where(w => w.Draftsman.TeamId == team.Id).ToList();
+            var planned = members.Sum(m => m.PlannedHours);
+            var capacity = members.Sum(m => m.CapacityHours);
+
+            <section class="card-panel team-card">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="mb-0">@team.Name</h2>
+                        <div class="small text-secondary">Lead: @team.Lead · @members.Count draftsmen</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fs-5 fw-bold">@Format.Percent(capacity == 0 ? 0 : (double)planned / capacity)</div>
+                        <div class="small text-secondary">@planned / @capacity h</div>
+                    </div>
+                </div>
+
+                @foreach (var member in members)
+                {
+                    <div class="member">
+                        <div class="avatar" aria-hidden="true">@(member.Draftsman.Name[..1])</div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-semibold">@member.Draftsman.Name</span>
+                                <span class="small text-secondary">@member.OpenJobs open · @Format.Percent(member.Utilisation)</span>
+                            </div>
+                            <Meter Value="member.Utilisation" />
+                        </div>
+                    </div>
+                }
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private RdSnapshot? _data;
+    private IReadOnlyList<Workload> _workload = [];
+    private DateOnly _today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _today = Clock.Today;
+        _data = await Data.GetSnapshotAsync();
+        _workload = Reports.WorkloadFor(_today.Year, _today.Month, _data);
+    }
+}

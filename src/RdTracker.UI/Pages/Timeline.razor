@@ -1,0 +1,110 @@
+@page "/timeline"
+@inject IRdDataService Data
+@inject IClock Clock
+
+<PageTitle>Timeline · R&amp;D Tracker</PageTitle>
+
+<header class="page-head">
+    <div>
+        <h1>Timeline</h1>
+        <p class="text-secondary mb-0">Plan (light) against actual (solid) for each draftsman.</p>
+    </div>
+    <div class="month-nav">
+        <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Previous month" @onclick="() => Shift(-1)"><Icon Name="chevron-left" /></button>
+        <span class="fw-semibold" id="timeline-month">@Format.Month(_month.Year, _month.Month)</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Next month" @onclick="() => Shift(1)"><Icon Name="chevron-right" /></button>
+    </div>
+</header>
+
+@if (_data is not null)
+{
+    <div class="card-panel timeline-wrap">
+        <div class="timeline" style="--days: @DaysInMonth">
+            <div class="tl-row tl-head">
+                <div class="tl-name"></div>
+                <div class="tl-track">
+                    @for (var day = 1; day <= DaysInMonth; day++)
+                    {
+                        var date = new DateOnly(_month.Year, _month.Month, day);
+                        <div class="tl-day @(WorkCalendar.IsWorkingDay(date) ? "" : "off") @(date == _today ? "today" : "")">@day</div>
+                    }
+                </div>
+            </div>
+
+            @foreach (var team in _data.Teams)
+            {
+                <div class="tl-team">@team.Name</div>
+                @foreach (var draftsman in _data.Draftsmen.Where(d => d.TeamId == team.Id))
+                {
+                    <div class="tl-row">
+                        <div class="tl-name">@draftsman.Name</div>
+                        <div class="tl-track tl-lane">
+                            @foreach (var view in JobsOf(draftsman))
+                            {
+                                var plan = Place(view.Job.PlannedStart, view.Job.PlannedFinish);
+                                if (plan is { } p)
+                                {
+                                    <a class="tl-bar plan" href="@($"jobs/{view.Job.Id}")" style="left: @Format.Num(p.Left)%; width: @Format.Num(p.Width)%"
+                                       title="@($"{view.Type.Name} · plan {Format.ShortDate(view.Job.PlannedStart)}–{Format.ShortDate(view.Job.PlannedFinish)}")">
+                                        <span>@view.Type.Code</span>
+                                    </a>
+                                }
+
+                                if (view.Job.StartedOn is { } started && Place(started, view.Job.ApprovedOn ?? _today) is { } a)
+                                {
+                                    <a class="tl-bar actual @Format.StatusClass(view.Status)" href="@($"jobs/{view.Job.Id}")" style="left: @Format.Num(a.Left)%; width: @Format.Num(a.Width)%"
+                                       title="@($"{view.Type.Name} · {Format.Status(view.Status)}")"></a>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="legend mt-3">
+        <span class="swatch plan"></span> Planned
+        <span class="swatch st-approved ms-3"></span> Approved
+        <span class="swatch st-progress ms-3"></span> In progress
+        <span class="swatch st-overdue ms-3"></span> Overdue
+    </div>
+}
+
+@code {
+    private RdSnapshot? _data;
+    private IReadOnlyList<JobView> _views = [];
+    private DateOnly _today;
+    private DateOnly _month;
+
+    private int DaysInMonth => DateTime.DaysInMonth(_month.Year, _month.Month);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _today = Clock.Today;
+        _month = new DateOnly(_today.Year, _today.Month, 1);
+        _data = await Data.GetSnapshotAsync();
+        _views = _data.Views(_today);
+    }
+
+    private void Shift(int months) => _month = _month.AddMonths(months);
+
+    private IEnumerable<JobView> JobsOf(Draftsman draftsman) =>
+        _views.Where(v => v.Draftsman.Id == draftsman.Id);
+
+    /// <summary>Position of a date range inside the visible month as percentages, or null when outside it.</summary>
+    private (double Left, double Width)? Place(DateOnly from, DateOnly to)
+    {
+        var monthEnd = _month.AddDays(DaysInMonth - 1);
+        if (to < _month || from > monthEnd || to < from)
+        {
+            return null;
+        }
+
+        var start = from < _month ? _month : from;
+        var end = to > monthEnd ? monthEnd : to;
+        var left = 100.0 * (start.Day - 1) / DaysInMonth;
+        var width = 100.0 * (end.Day - start.Day + 1) / DaysInMonth;
+        return (left, width);
+    }
+}
