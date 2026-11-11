@@ -1,0 +1,11 @@
+  Determining projects to restore...
+  Restored /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.Core/RdTracker.Core.csproj (in 97 ms).
+  Restored /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.UI/RdTracker.UI.csproj (in 1.55 sec).
+  Restored /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/tests/RdTracker.Tests/RdTracker.Tests.csproj (in 1.75 sec).
+  RdTracker.Core -> /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.Core/bin/Release/net10.0/RdTracker.Core.dll
+  RdTracker.UI -> /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.UI/bin/Release/net10.0/RdTracker.UI.dll
+  RdTracker.Tests -> /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/tests/RdTracker.Tests/bin/Release/net10.0/RdTracker.Tests.dll
+Test run for /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/tests/RdTracker.Tests/bin/Release/net10.0/RdTracker.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:    32, Skipped:     0, Total:    32, Duration: 1 s - RdTracker.Tests.dll (net10.0)

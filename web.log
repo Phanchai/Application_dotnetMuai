@@ -1,0 +1,11 @@
+  Determining projects to restore...
+  Restored /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.Web/RdTracker.Web.csproj (in 1.33 sec).
+  2 of 3 projects are up-to-date for restore.
+  RdTracker.Core -> /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.Core/bin/Release/net10.0/RdTracker.Core.dll
+  RdTracker.UI -> /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.UI/bin/Release/net10.0/RdTracker.UI.dll
+  RdTracker.Web -> /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.Web/bin/Release/net10.0/RdTracker.Web.dll
+  RdTracker.Web (Blazor output) -> /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/src/RdTracker.Web/bin/Release/net10.0/wwwroot
+  Optimizing assemblies for size may change the behavior of the app. Be sure to test after publishing. See: https://aka.ms/dotnet-illink
+  Optimizing assemblies for size. This process might take a while.
+  Publishing without optimizations. Although it's optional for Blazor, we strongly recommend using `wasm-tools` workload! You can install it by running `dotnet workload install wasm-tools` from the command line.
+  RdTracker.Web -> /home/runner/work/Application_dotnetMuai/Application_dotnetMuai/publish/
