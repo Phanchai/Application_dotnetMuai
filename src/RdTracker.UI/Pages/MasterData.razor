@@ -1,0 +1,122 @@
+@page "/master"
+@inject IRdDataService Data
+@inject SessionState Session
+
+<PageTitle>Master data · R&amp;D Tracker</PageTitle>
+
+<header class="page-head">
+    <div>
+        <h1>Master data</h1>
+        <p class="text-secondary mb-0">Brands, model types and projects used when planning jobs.</p>
+    </div>
+</header>
+
+@if (_data is not null)
+{
+    <div class="grid-2">
+        <section class="card-panel">
+            <h2>Brands</h2>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger py-2" role="alert" id="brand-error">@_error</div>
+            }
+            <ul class="list-plain" id="brand-list">
+                @foreach (var brand in _data.Brands)
+                {
+                    <li class="d-flex justify-content-between align-items-center py-2">
+                        <span><span class="code-chip">@brand.Code</span> @brand.Name</span>
+                        @if (Session.IsManager)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-danger" aria-label="@($"Delete {brand.Name}")"
+                                    @onclick="() => DeleteBrandAsync(brand.Id)">
+                                <Icon Name="trash" Size="14" />
+                            </button>
+                        }
+                    </li>
+                }
+            </ul>
+            @if (Session.IsManager)
+            {
+                <form class="d-flex gap-2 mt-3" @onsubmit="AddBrandAsync" @onsubmit:preventDefault>
+                    <input class="form-control" style="max-width: 6.5rem" placeholder="Code" aria-label="Brand code" id="brand-code" @bind="_code" />
+                    <input class="form-control" placeholder="Brand name" aria-label="Brand name" id="brand-name" @bind="_name" />
+                    <button type="submit" class="btn btn-brand" id="brand-add">Add</button>
+                </form>
+            }
+        </section>
+
+        <section class="card-panel">
+            <h2>Model types</h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Code</th><th>Name</th><th>Group</th><th class="text-end">New</th><th class="text-end">Copy</th></tr></thead>
+                    <tbody>
+                        @foreach (var type in _data.ModelTypes)
+                        {
+                            <tr>
+                                <td><span class="code-chip">@type.Code</span></td>
+                                <td>@type.Name</td>
+                                <td class="text-secondary">@type.Group</td>
+                                <td class="text-end">@type.StandardHours h</td>
+                                <td class="text-end">@type.CopyHours h</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <section class="card-panel">
+        <h2>Projects</h2>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>Project</th><th>Brand</th><th>Owner</th><th>Received</th><th>Due</th><th class="text-end">Jobs</th></tr></thead>
+                <tbody>
+                    @foreach (var project in _data.Projects)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@project.Name</td>
+                            <td>@_data.BrandOf(project).Name</td>
+                            <td>@project.Owner</td>
+                            <td class="text-nowrap">@Format.Date(project.ReceivedOn)</td>
+                            <td class="text-nowrap">@Format.Date(project.DueOn)</td>
+                            <td class="text-end">@_data.Jobs.Count(j => j.ProjectId == project.Id)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private RdSnapshot? _data;
+    private string _code = "";
+    private string _name = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => _data = await Data.GetSnapshotAsync();
+
+    private Task AddBrandAsync() => RunAsync(async () =>
+    {
+        await Data.AddBrandAsync(_code, _name);
+        _code = _name = "";
+    });
+
+    private Task DeleteBrandAsync(int id) => RunAsync(() => Data.DeleteBrandAsync(id));
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _error = null;
+        try
+        {
+            await action();
+            _data = await Data.GetSnapshotAsync();
+        }
+        catch (RdValidationException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

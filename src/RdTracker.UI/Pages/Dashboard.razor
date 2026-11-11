@@ -1,0 +1,123 @@
+@page "/"
+@inject IRdDataService Data
+@inject IClock Clock
+
+<PageTitle>Dashboard · R&amp;D Tracker</PageTitle>
+
+@if (_data is null || _summary is null)
+{
+    <div class="empty">Loading…</div>
+}
+else
+{
+    <header class="page-head">
+        <div>
+            <h1>Dashboard</h1>
+            <p class="text-secondary mb-0">@Format.Date(_today) · @_summary.Projects active projects</p>
+        </div>
+    </header>
+
+    <section class="stats">
+        <StatCard Label="Open jobs" Value="@_summary.OpenJobs.ToString()" Hint="@($"of {_summary.Jobs} total")" />
+        <StatCard Label="Overdue" Value="@_summary.Overdue.ToString()" Tone="@(_summary.Overdue > 0 ? "bad" : "good")" Hint="past planned finish" />
+        <StatCard Label="On-time approval" Value="@Format.Percent(_summary.OnTimeRate)" Tone="@(_summary.OnTimeRate >= 0.8 ? "good" : "warn")" Hint="approved by the planned date" />
+        <StatCard Label="Draftsmen" Value="@_summary.Draftsmen.ToString()" Hint="@($"{_data.Teams.Count} teams")" />
+    </section>
+
+    <div class="grid-2">
+        <section class="card-panel">
+            <div class="panel-head">
+                <h2>Jobs by planned finish</h2>
+                <div class="legend"><span class="dot dot-approved"></span> Approved <span class="dot dot-open ms-2"></span> Open</div>
+            </div>
+            <div class="bars" role="img" aria-label="Approved and open jobs per month">
+                @foreach (var month in _months)
+                {
+                    <div class="bar-col" title="@($"{Format.Month(month.Year, month.Month)}: {month.Approved} approved, {month.Open} open")">
+                        <div class="bar-stack">
+                            <div class="bar bar-open" style="height: @Format.Num(Height(month.Open))%"></div>
+                            <div class="bar bar-approved" style="height: @Format.Num(Height(month.Approved))%"></div>
+                        </div>
+                        <div class="bar-value">@month.Total</div>
+                        <div class="bar-label">@Format.MonthShort(month.Year, month.Month)</div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="card-panel">
+            <div class="panel-head">
+                <h2>Needs attention</h2>
+                <a href="jobs" class="small">All jobs</a>
+            </div>
+            @if (_attention.Count == 0)
+            {
+                <p class="text-secondary mb-0">Nothing is overdue or due in the next three days.</p>
+            }
+            else
+            {
+                <ul class="list-plain">
+                    @foreach (var view in _attention)
+                    {
+                        <li>
+                            <a class="row-link" href="@($"jobs/{view.Job.Id}")">
+                                <span>
+                                    <span class="fw-semibold">@view.Type.Name</span>
+                                    <span class="text-secondary"> · @view.Project.Name</span>
+                                    <span class="d-block small text-secondary">@view.Draftsman.Name · due @Format.ShortDate(view.Job.PlannedFinish)</span>
+                                </span>
+                                <StatusBadge Status="view.Status" />
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+
+    <section class="card-panel">
+        <div class="panel-head">
+            <h2>Workload — @Format.Month(_today.Year, _today.Month)</h2>
+            <a href="teams" class="small">Teams</a>
+        </div>
+        <div class="workload">
+            @foreach (var load in _workload)
+            {
+                <div class="workload-row">
+                    <div class="workload-name">@load.Draftsman.Name</div>
+                    <Meter Value="load.Utilisation" />
+                    <div class="workload-num">@load.PlannedHours / @load.CapacityHours h</div>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private RdSnapshot? _data;
+    private DashboardSummary? _summary;
+    private IReadOnlyList<MonthlyCompletion> _months = [];
+    private IReadOnlyList<Workload> _workload = [];
+    private IReadOnlyList<JobView> _attention = [];
+    private DateOnly _today;
+    private int _maxMonth = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _today = Clock.Today;
+        _data = await Data.GetSnapshotAsync();
+        _summary = Reports.Summary(_data, _today);
+        _months = Reports.CompletionByMonth(_data.Jobs, _today, months: 3);
+        _maxMonth = Math.Max(1, _months.Max(m => m.Total));
+        _workload = Reports.WorkloadFor(_today.Year, _today.Month, _data);
+
+        var soon = _today.AddDays(3);
+        _attention = _data.Views(_today)
+            .Where(v => v.Status == JobStatus.Overdue || (v.Status != JobStatus.Approved && v.Job.PlannedFinish <= soon))
+            .OrderBy(v => v.Job.PlannedFinish)
+            .Take(6)
+            .ToList();
+    }
+
+    private double Height(int count) => 100.0 * count / _maxMonth;
+}

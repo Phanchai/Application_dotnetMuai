@@ -1,0 +1,12 @@
+<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)Math.Round(Clamped * 100))">
+    <div class="meter-fill @Tone" style="width: @Format.Num(Clamped * 100)%"></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public double Value { get; set; }
+
+    private double Clamped => Math.Clamp(Value, 0, 1);
+
+    /// <summary>Over 100 % of capacity is red, over 85 % amber.</summary>
+    private string Tone => Value > 1 ? "bad" : Value > 0.85 ? "warn" : "";
+}

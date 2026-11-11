@@ -1,0 +1,5 @@
+<span class="status @Format.StatusClass(Status)">@Format.Status(Status)</span>
+
+@code {
+    [Parameter, EditorRequired] public JobStatus Status { get; set; }
+}

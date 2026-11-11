@@ -1,0 +1,20 @@
+# Build output
+bin/
+obj/
+publish/
+*.apk
+*.aab
+*.ipa
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+
+# Tooling
+node_modules/
+TestResults/

@@ -1,0 +1,125 @@
+@page "/jobs/{Id:int}"
+@inject IRdDataService Data
+@inject IClock Clock
+@inject SessionState Session
+@inject NavigationManager Nav
+
+<PageTitle>Job #@Id · R&amp;D Tracker</PageTitle>
+
+@if (_notFound)
+{
+    <div class="empty">
+        <h1 class="h4">Job #@Id was not found</h1>
+        <a href="jobs">Back to jobs</a>
+    </div>
+}
+else if (_view is not null)
+{
+    <header class="page-head">
+        <div>
+            <a class="small" href="jobs"><Icon Name="chevron-left" Size="14" /> Jobs</a>
+            <h1>@_view.Type.Name <span class="text-secondary fw-normal">#@Id</span></h1>
+            <p class="text-secondary mb-0">@_view.Project.Name · @_view.Brand.Name</p>
+        </div>
+        <StatusBadge Status="_view.Status" />
+    </header>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+
+    <div class="grid-2">
+        <section class="card-panel">
+            <h2>Details</h2>
+            <dl class="facts">
+                <dt>Draftsman</dt><dd>@_view.Draftsman.Name <span class="text-secondary">· @_view.Team.Name</span></dd>
+                <dt>Model type</dt><dd>@_view.Type.Name (@_view.Type.Code) <span class="text-secondary">· @_view.Type.Group</span></dd>
+                <dt>Kind</dt><dd>@(_view.Job.Kind == JobKind.Copy ? "Copy of an existing design" : "New design")</dd>
+                <dt>Quantity</dt><dd>@_view.Job.Quantity</dd>
+                <dt>Planned effort</dt><dd>@_view.PlannedHours h</dd>
+                <dt>Remark</dt><dd>@(string.IsNullOrWhiteSpace(_view.Job.Remark) ? "—" : _view.Job.Remark)</dd>
+            </dl>
+        </section>
+
+        <section class="card-panel">
+            <h2>Plan vs actual</h2>
+            <dl class="facts">
+                <dt>Planned</dt><dd>@Format.Date(_view.Job.PlannedStart) → @Format.Date(_view.Job.PlannedFinish)</dd>
+                <dt>Started</dt><dd>@Format.Date(_view.Job.StartedOn)</dd>
+                <dt>Approved</dt><dd>@Format.Date(_view.Job.ApprovedOn)</dd>
+                <dt>Delay</dt>
+                <dd class="@(_view.DelayDays > 0 ? "text-danger fw-semibold" : "")">
+                    @(_view.DelayDays > 0 ? $"{_view.DelayDays} day(s) late" : "On schedule")
+                </dd>
+            </dl>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                @if (Session.CanStart(_view.Job))
+                {
+                    <button type="button" class="btn btn-brand" id="btn-start" @onclick="StartAsync"><Icon Name="play" Size="14" /> Start today</button>
+                }
+                @if (Session.CanApprove(_view.Job))
+                {
+                    <button type="button" class="btn btn-success" id="btn-approve" @onclick="ApproveAsync"><Icon Name="check" Size="14" /> Approve</button>
+                }
+                @if (Session.CanEdit(_view.Job))
+                {
+                    <a class="btn btn-outline-secondary" href="@($"jobs/{Id}/edit")"><Icon Name="edit" Size="14" /> Edit</a>
+                    @if (_confirmDelete)
+                    {
+                        <button type="button" class="btn btn-danger" @onclick="DeleteAsync">Confirm delete</button>
+                        <button type="button" class="btn btn-link" @onclick="() => _confirmDelete = false">Cancel</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmDelete = true"><Icon Name="trash" Size="14" /> Delete</button>
+                    }
+                }
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private JobView? _view;
+    private bool _notFound;
+    private bool _confirmDelete;
+    private string? _error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var data = await Data.GetSnapshotAsync();
+        var job = data.Jobs.FirstOrDefault(j => j.Id == Id);
+        _notFound = job is null;
+        _view = job is null ? null : data.View(job, Clock.Today);
+    }
+
+    private Task StartAsync() => RunAsync(() => Data.StartJobAsync(Id, Clock.Today));
+
+    private Task ApproveAsync() => RunAsync(() => Data.ApproveJobAsync(Id, Clock.Today));
+
+    private async Task DeleteAsync()
+    {
+        await Data.DeleteJobAsync(Id);
+        Nav.NavigateTo("jobs");
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _error = null;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (RdValidationException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

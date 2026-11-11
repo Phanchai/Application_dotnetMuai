@@ -1,0 +1,128 @@
+@page "/jobs"
+@inject IRdDataService Data
+@inject IClock Clock
+@inject SessionState Session
+
+<PageTitle>Jobs · R&amp;D Tracker</PageTitle>
+
+<header class="page-head">
+    <div>
+        <h1>Jobs</h1>
+        <p class="text-secondary mb-0" id="job-count">@Filtered.Count of @_views.Count jobs</p>
+    </div>
+    @if (Session.IsManager)
+    {
+        <a class="btn btn-brand" href="jobs/new"><Icon Name="plus" /> New job</a>
+    }
+</header>
+
+<div class="filters">
+    <input class="form-control" type="search" placeholder="Search model, project, brand or draftsman" aria-label="Search"
+           @bind="_query" @bind:event="oninput" />
+    <select class="form-select" aria-label="Team" id="filter-team" @bind="_teamId">
+        <option value="0">All teams</option>
+        @foreach (var team in _teams)
+        {
+            <option value="@team.Id">@team.Name</option>
+        }
+    </select>
+    <select class="form-select" aria-label="Status" id="filter-status" @bind="_status">
+        <option value="">All statuses</option>
+        @foreach (var status in Enum.GetValues<JobStatus>())
+        {
+            <option value="@status">@Format.Status(status)</option>
+        }
+    </select>
+</div>
+
+@if (Filtered.Count == 0)
+{
+    <div class="empty">No jobs match these filters.</div>
+}
+else
+{
+    <div class="card-panel p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 jobs-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Project</th>
+                        <th>Draftsman</th>
+                        <th>Plan</th>
+                        <th class="text-end">Hours</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var view in Filtered)
+                    {
+                        <tr class="job-row">
+                            <td>
+                                <a class="fw-semibold" href="@($"jobs/{view.Job.Id}")">@view.Type.Name</a>
+                                <div class="small text-secondary">@JobLine(view.Job)</div>
+                            </td>
+                            <td>
+                                @view.Project.Name
+                                <div class="small text-secondary">@view.Brand.Name</div>
+                            </td>
+                            <td>
+                                @view.Draftsman.Name
+                                <div class="small text-secondary">@view.Team.Name</div>
+                            </td>
+                            <td class="text-nowrap">@Format.ShortDate(view.Job.PlannedStart) – @Format.ShortDate(view.Job.PlannedFinish)</td>
+                            <td class="text-end">@view.PlannedHours</td>
+                            <td>
+                                <StatusBadge Status="view.Status" />
+                                @if (view.DelayDays > 0)
+                                {
+                                    <div class="small text-danger">+@view.DelayDays d</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<JobView> _views = [];
+    private IReadOnlyList<Team> _teams = [];
+    private string _query = "";
+    private int _teamId;
+    private string _status = "";
+
+    private List<JobView> Filtered
+    {
+        get
+        {
+            var query = _query.Trim();
+            return _views
+                .Where(v => _teamId == 0 || v.Team.Id == _teamId)
+                .Where(v => _status.Length == 0 || v.Status.ToString() == _status)
+                .Where(v => query.Length == 0
+                    || Contains(v.Type.Name, query) || Contains(v.Project.Name, query)
+                    || Contains(v.Brand.Name, query) || Contains(v.Draftsman.Name, query))
+                .ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var data = await Data.GetSnapshotAsync();
+        _teams = data.Teams;
+        // Most urgent first: open jobs by planned finish, then approved ones.
+        _views = data.Views(Clock.Today)
+            .OrderBy(v => v.Status == JobStatus.Approved)
+            .ThenBy(v => v.Status == JobStatus.Approved ? -v.Job.PlannedFinish.DayNumber : v.Job.PlannedFinish.DayNumber)
+            .ToList();
+    }
+
+    private static string JobLine(DesignJob job) =>
+        $"#{job.Id} · {job.Kind}" + (job.Quantity > 1 ? $" ×{job.Quantity}" : "");
+
+    private static bool Contains(string text, string query) =>
+        text.Contains(query, StringComparison.OrdinalIgnoreCase);
+}

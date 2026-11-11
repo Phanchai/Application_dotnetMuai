@@ -1,0 +1,74 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject SessionState Session
+@inject NavigationManager Nav
+
+@if (Session.User is null)
+{
+    <Login />
+}
+else
+{
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-mark"><Icon Name="ruler" Size="18" /></span>
+                <span>R&amp;D Tracker</span>
+            </div>
+            <nav class="side-nav" aria-label="Main">
+                @foreach (var link in Links)
+                {
+                    <NavLink class="side-link" href="@link.Href" Match="@link.Match">
+                        <Icon Name="@link.Icon" /> <span>@link.Label</span>
+                    </NavLink>
+                }
+            </nav>
+            <div class="side-user">
+                <div class="fw-semibold">@Session.User.DisplayName</div>
+                <div class="small text-muted-inv">@Session.User.Role</div>
+                <button type="button" class="btn btn-sm btn-outline-light w-100 mt-2" @onclick="SignOut">
+                    <Icon Name="logout" Size="14" /> Sign out
+                </button>
+            </div>
+        </aside>
+
+        <main class="content">
+            @Body
+        </main>
+
+        <nav class="tabbar" aria-label="Main">
+            @foreach (var link in Links)
+            {
+                <NavLink class="tab-link" href="@link.Href" Match="@link.Match">
+                    <Icon Name="@link.Icon" Size="20" />
+                    <span>@link.Label</span>
+                </NavLink>
+            }
+        </nav>
+    </div>
+}
+
+@code {
+    private sealed record NavItem(string Href, string Label, string Icon, NavLinkMatch Match = NavLinkMatch.Prefix);
+
+    private static readonly NavItem[] Links =
+    [
+        new("", "Dashboard", "home", NavLinkMatch.All),
+        new("jobs", "Jobs", "list"),
+        new("timeline", "Timeline", "calendar"),
+        new("teams", "Teams", "users"),
+        new("master", "Master data", "database"),
+    ];
+
+    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+
+    private void SignOut()
+    {
+        Session.SignOut();
+        Nav.NavigateTo("");
+    }
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+}
